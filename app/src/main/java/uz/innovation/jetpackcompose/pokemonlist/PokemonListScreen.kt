@@ -1,6 +1,5 @@
 package uz.innovation.jetpackcompose.pokemonlist
 
-import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,6 +25,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,7 +48,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import uz.innovation.jetpackcompose.R
@@ -57,7 +56,8 @@ import uz.innovation.jetpackcompose.ui.theme.RobotoCondensed
 
 @Composable
 fun PokemonListScreen(
-    navController: NavController
+    navController: NavController,
+    viewModel: PokemonListViewModel = hiltViewModel()
 ) {
     Surface(
         color = MaterialTheme.colorScheme.background,
@@ -78,7 +78,7 @@ fun PokemonListScreen(
                     .fillMaxWidth()
                     .padding(16.dp)
             ) {
-
+                viewModel.searchPokemonList(it)
             }
             Spacer(modifier = Modifier.height(16.dp))
             PokemonList(navController = navController)
@@ -118,7 +118,7 @@ fun SearchBar(
                     isHintDisplayed = !it.isFocused
                 }
         )
-        if(isHintDisplayed) {
+        if (isHintDisplayed) {
             Text(
                 text = hint,
                 color = Color.LightGray,
@@ -138,16 +138,19 @@ fun PokemonList(
     val endReached by remember { viewModel.endReached }
     val loadError by remember { viewModel.loadError }
     val isLoading by remember { viewModel.isLoading }
+    val isSearching by remember { viewModel.isSearching }
 
     LazyColumn(contentPadding = PaddingValues(16.dp)) {
-        val itemCount = if(pokemonList.size % 2 == 0) {
+        val itemCount = if (pokemonList.size % 2 == 0) {
             pokemonList.size / 2
         } else {
             pokemonList.size / 2 + 1
         }
         items(itemCount) {
-            if(it >= itemCount - 1 && !endReached) {
-                viewModel.loadPokemonPaginated()
+            if (it >= itemCount - 1 && !endReached && !isLoading && !isSearching) {
+                LaunchedEffect(key1 = true){
+                    viewModel.loadPokemonPaginated()
+                }
             }
             PokedexRow(rowIndex = it, entries = pokemonList, navController = navController)
         }
@@ -157,10 +160,10 @@ fun PokemonList(
         contentAlignment = Center,
         modifier = Modifier.fillMaxSize()
     ) {
-        if(isLoading) {
+        if (isLoading) {
             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
         }
-        if(loadError.isNotEmpty()) {
+        if (loadError.isNotEmpty()) {
             RetrySection(error = loadError) {
                 viewModel.loadPokemonPaginated()
             }
@@ -223,7 +226,7 @@ fun PokedexEntry(
                     .size(120.dp)
                     .align(CenterHorizontally),
 
-            )
+                )
 
             Text(
                 text = entry.pokemonName,
@@ -250,7 +253,7 @@ fun PokedexRow(
                 modifier = Modifier.weight(1f)
             )
             Spacer(modifier = Modifier.width(16.dp))
-            if(entries.size >= rowIndex * 2 + 2) {
+            if (entries.size >= rowIndex * 2 + 2) {
                 PokedexEntry(
                     entry = entries[rowIndex * 2 + 1],
                     navController = navController,
