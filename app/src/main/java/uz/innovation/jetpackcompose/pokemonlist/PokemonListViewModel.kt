@@ -5,11 +5,11 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.capitalize
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.palette.graphics.Palette
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import uz.innovation.jetpackcompose.data.models.PokedexListEntry
 import uz.innovation.jetpackcompose.repository.PokemonRepository
@@ -30,8 +30,35 @@ class PokemonListViewModel @Inject constructor(
     var isLoading = mutableStateOf(false)
     var endReached = mutableStateOf(false)
 
+    private var cashePolemonList = listOf<PokedexListEntry>()
+    private var isSearchSTarting = true
+    var isSearching = mutableStateOf(false)
+
     init {
         loadPokemonPaginated()
+    }
+
+    fun searchPokemonList(quary: String) {
+        val listToSearch = if (isSearchSTarting) pokemonList.value else cashePolemonList
+
+        viewModelScope.launch(Dispatchers.Default) {
+            if (quary.isEmpty()){
+                pokemonList.value = cashePolemonList
+                isSearching.value = false
+                isSearchSTarting = true
+                return@launch
+            }
+            val results = listToSearch.filter {
+                it.pokemonName.contains(quary.trim(), ignoreCase = true) ||
+                        it.number.toString() == quary.trim()
+            }
+            if (isSearchSTarting){
+                cashePolemonList = pokemonList.value
+                isSearchSTarting = false
+            }
+            pokemonList.value = results
+            isSearching.value = true
+        }
     }
 
     fun loadPokemonPaginated() {
@@ -42,12 +69,13 @@ class PokemonListViewModel @Inject constructor(
                 is Resource.Success -> {
                     endReached.value = curPage * PAGE_SIZE >= result.data!!.count!!
                     val pokedexEntries = result.data.results.mapIndexed { index, entry ->
-                        val number = if (entry.url!!.endsWith("/")){
+                        val number = if (entry.url!!.endsWith("/")) {
                             entry.url!!.dropLast(1).takeLastWhile { it.isDigit() }
-                        }else{
+                        } else {
                             entry.url!!.takeLastWhile { it.isDigit() }
                         }
-                        val url = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${number}.png"
+                        val url =
+                            "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${number}.png"
                         PokedexListEntry(entry.name!!.capitalize(Locale.ROOT), url, number.toInt())
                     }
                     curPage++
